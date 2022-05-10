@@ -28,7 +28,7 @@ std::pair<float, float> toTheball(float lineAngle, float robotAngle, float robot
     }
     else{
 
-        if(fabs(robotAngle) - 3.14159 > 0.1){
+        if(fabs(robotAngle) - 3.1415 > 0.1){
             if(robotAngle < 0){
                 return std::make_pair(0.0, -1.5);
             }
