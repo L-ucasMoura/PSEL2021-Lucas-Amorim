@@ -27,30 +27,23 @@ std::pair<float, float> toTheball(float lineAngle, float robotAngle, float robot
         }
     }
     else{
-        if(robotAngle < 0.2){
-            return std::make_pair(2.0, 0.0);
+
+        if(fabs(robotAngle) - 3.14159 > 0.1){
+            if(robotAngle < 0){
+                return std::make_pair(0.0, -1.5);
+            }
+            else{
+                return  std::make_pair(0.0, 1.5);
+            }
 
         }
         else{
-            return std::make_pair(0.0, 1.5);
+            return  std::make_pair(2.0, 0.0);
         }
 
-//        if(fabs(robotAngle*57.2958) - 180 > 6){
-//            if(robotAngle < 0){
-//                return std::make_pair(0.0, -1.5);
-//            }
-//            else{
-//                return  std::make_pair(0.0, 1.5);
-//            }
-
-//        }
-//        else{
-//            return  std::make_pair(2.0, 0.0);
-//        }
-
-//    }
     }
 }
+
 
 int main(int argc, char *argv[]) {
     QCoreApplication a(argc, argv);
