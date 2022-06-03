@@ -5,6 +5,19 @@
 #include <modules/vision/vision.h>
 #include <cmath>
 
+struct jogador
+{
+    int robot;
+    float vx, vw, kick;
+    bool dribble;
+};
+
+
+struct kkk
+{
+    float d1, d2, d3;
+};
+
 
 struct data {
     float vx, vy, vw, kick = 0;
@@ -12,6 +25,48 @@ struct data {
 };
 
 typedef struct data Struct;
+
+std::pair <float, float> line_and_AngleMaker(float x_active, float y_active, float x_target, float y_target){
+
+
+    float Distance = hypot((x_target - x_active), (y_target - y_active));
+    float Angle = acos((x_target - x_active)/Distance);
+
+    if(y_target < y_active){
+        Angle = 2*M_PI - Angle;
+    }
+
+    return std::make_pair (Distance, Angle);
+}
+
+
+kkk elect(kkk e){
+    using namespace std;
+    // Declaring vector of pairs
+        vector< pair <int,float> > vect;
+
+        // Initializing 1st and 2nd element of
+        // pairs with array values
+        int players[] = {0, 1, 2};
+        float distances[] = {e.d1, e.d2, e.d3};
+
+        // Entering values in vector of pairs
+        for (int i=0; i<3; i++)
+            vect.push_back( make_pair(distances[i], players[i]));
+
+
+        // Using simple sort() function to sort
+           sort(vect.begin(), vect.end());
+
+
+        kkk result;
+        result.d1 = vect[0].second;
+        result.d2 = vect[1].second;
+        result.d3 = vect[2].second;
+
+        return result;
+}
+
 
 Struct passar(float activeAngle, float passiveAngle, float yactive, float ypassive, float playersDistance){
    Struct p;
@@ -110,61 +165,95 @@ int main(int argc, char *argv[]) {
     // Desired frequency
     int desiredFrequency = 60;
 
-    int robot = 0;
+
+    bool inicio = true;
+    //int armador, atacante, meia;
     float playerAngle, trave1, trave2, kickAngle;
-    Struct result;
+    Struct result; kkk distances; kkk players;
+
+    jogador armador, meia, atacante;
+
 
 
     while(true) {
 
+
         // TimePoint
         std::chrono::high_resolution_clock::time_point beforeProcess = std::chrono::high_resolution_clock::now();
         SSL_DetectionBall ball = vision->getLastBallDetection();
-        SSL_DetectionRobot player = vision->getLastRobotDetection(false, robot);
-        SSL_DetectionRobot player2 = vision->getLastRobotDetection(false, 1);
+        SSL_DetectionRobot player0 = vision->getLastRobotDetection(false, 0);
+        SSL_DetectionRobot player1 = vision->getLastRobotDetection(false, 1);
+        SSL_DetectionRobot player2 = vision->getLastRobotDetection(false, 2);
+
+        distances.d1 = line_and_AngleMaker(player0.x(), player0.y(), ball.x(), ball.y()).first;
+        distances.d2 = line_and_AngleMaker(player1.x(), player1.y(), ball.x(), ball.y()).first;
+        distances.d3 = line_and_AngleMaker(player2.x(), player2.y(), ball.x(), ball.y()).first;
+
+        if(inicio && distances.d1 > 0 && distances.d2 > 0 && distances.d3 > 0){
+            players = elect(distances);
+            inicio = false;
+            std::cout << players.d1 << '\n';
+            std::cout << players.d2 << '\n';
+            std::cout << players.d3 << '\n';
+        }
+
 
 
         // Process vision and actuator commands
         vision->processNetworkDatagrams();
 
-        float p_y = (player2.y() - player.y());
-        float p_x = (player2.x() - player.x());
-        float playerDistance = hypot(p_x, p_y);
-        float passAngle = acos(p_x/playerDistance);
 
-
-        // player/ball measures
-        float desl_y = (ball.y() - player.y());             //resultado em pixel
-        float desl_x = (ball.x() - player.x());             //resultado em pixel
-        float ballDistance = hypot(desl_x, desl_y);         //resultado em pixels
-        float BallAngle = acos(desl_x/ballDistance);        //resultado em rad
-        trave1 = acos((4502 - player.x()) / hypot((4502 - player.x()),(494 - player.y())));     //resultado em rad
-        trave2 = acos((4502 - player.x()) / hypot((4502 - player.x()),(-494 - player.y())));    //resultado em rad
-
-
-        if(player2.y() < player.y()){
-            passAngle = -passAngle;
-            //passAngle = 2*M_PI - passAngle;
-        }
-        // ângulo vai de 0 a 2pi ao invés de ir de -pi à +pi
-        if(ball.y() < player.y()){
-            BallAngle = 2*M_PI - BallAngle;
-        }
-        playerAngle = player.orientation();
+        playerAngle = player0.orientation();
         if(playerAngle < 0){
             playerAngle = 2*M_PI + playerAngle;
         }
+        SSL_DetectionRobot active = player0;
 
-        if(player.y() > -494){
-            trave2 = -trave2;
-            if(ball.y() > 494){
-                trave1 = -trave1;
+
+        std::pair<float, float> geometry = line_and_AngleMaker(active.x(), active.y(), ball.x(), ball.y());
+
+        // geometry.first = distance, geometry.second = angle
+        if(geometry.first > 300){
+            result = direct_to_target(geometry.second, playerAngle);
+            result.vx = 1 + 0.5*(geometry.first/1000);
+        }
+        else{
+            result = dominio(playerAngle, geometry.second);
             }
-        }
-        kickAngle = (trave1 + trave2)/2;
-        if(kickAngle < 0){
-            kickAngle = 2*M_PI + kickAngle;
-        }
+
+//        else{
+//            if(geometry.first < 150 && fabs(geometry.second - playerAngle) < 0.4){
+//                result = passar(player0.orientation(), passAngle, player0.y(), player1.y(), playerDistance);
+//            }
+//            else{
+//                result = dominio(playerAngle, BallAngle);
+//            }
+//        }
+
+
+//        std::cout << passAngle*57.296 << '\n';
+//        std::cout << player.orientation()*57.296 << '\n';
+
+
+
+
+        actuator->sendCommand(false, 0, result.vx, result.vy, result.vw, result.dibble, result.kick);
+
+
+
+        // TimePoint
+        std::chrono::high_resolution_clock::time_point afterProcess = std::chrono::high_resolution_clock::now();
+
+        // Sleep thread
+        long remainingTime = (1000 / desiredFrequency) - (std::chrono::duration_cast<std::chrono::milliseconds>(afterProcess - beforeProcess)).count();
+        std::this_thread::sleep_for(std::chrono::milliseconds(remainingTime));
+    }
+
+
+
+    return a.exec();
+}
+
 
 //        //Ir até robo
 //        if(ballDistance < 160){
@@ -192,41 +281,41 @@ int main(int argc, char *argv[]) {
 //        }
 
 
-        if(ballDistance > 300){
-            result = direct_to_target(BallAngle, playerAngle);
-            result.vx = 1 + 0.5*(ballDistance/1000);
-        }
-        else{
-            if(ballDistance < 150 && fabs(BallAngle - playerAngle) < 0.4){
-                result = passar(player.orientation(), passAngle, player.y(), player2.y(), playerDistance);
-            }
-            else{
-                result = dominio(playerAngle, BallAngle);
-            }
-        }
+//float p_y = (player1.y() - player0.y());
+//float p_x = (player1.x() - player0.x());
+//float playerDistance = hypot(p_x, p_y);
+//float passAngle = acos(p_x/playerDistance);
 
 
-        std::cout << passAngle*57.296 << '\n';
-        std::cout << player.orientation()*57.296 << '\n';
+// // player/ball measures
+//float desl_y = (ball.y() - player0.y());             //resultado em pixel
+//float desl_x = (ball.x() - player0.x());             //resultado em pixel
+//float ballDistance = hypot(desl_x, desl_y);         //resultado em pixels
+//float BallAngle = acos(desl_x/ballDistance);        //resultado em rad
+//trave1 = acos((4502 - player0.x()) / hypot((4502 - player0.x()),(494 - player0.y())));     //resultado em rad
+//trave2 = acos((4502 - player0.x()) / hypot((4502 - player0.x()),(-494 - player0.y())));    //resultado em rad
 
 
+//if(player1.y() < player0.y()){
+//    passAngle = -passAngle;
+//    //passAngle = 2*M_PI - passAngle;
+//}
+// // ângulo vai de 0 a 2pi ao invés de ir de -pi à +pi
+//if(ball.y() < player0.y()){
+//    BallAngle = 2*M_PI - BallAngle;
+//}
+//playerAngle = player0.orientation();
+//if(playerAngle < 0){
+//    playerAngle = 2*M_PI + playerAngle;
+//}
 
-
-        actuator->sendCommand(false, robot, result.vx, result.vy, result.vw, result.dibble, result.kick);
-
-
-
-        // TimePoint
-        std::chrono::high_resolution_clock::time_point afterProcess = std::chrono::high_resolution_clock::now();
-
-        // Sleep thread
-        long remainingTime = (1000 / desiredFrequency) - (std::chrono::duration_cast<std::chrono::milliseconds>(afterProcess - beforeProcess)).count();
-        std::this_thread::sleep_for(std::chrono::milliseconds(remainingTime));
-    }
-
-
-
-    return a.exec();
-}
-
-
+//if(player0.y() > -494){
+//    trave2 = -trave2;
+//    if(ball.y() > 494){
+//        trave1 = -trave1;
+//    }
+//}
+//kickAngle = (trave1 + trave2)/2;
+//if(kickAngle < 0){
+//    kickAngle = 2*M_PI + kickAngle;
+//}
