@@ -5,18 +5,20 @@
 #include <modules/vision/vision.h>
 #include <cmath>
 
+struct detect{
+    SSL_DetectionBall ball;
+    SSL_DetectionRobot player;
+};
+
 struct jogador
 {
     int robot;
     float vx, vw, kick;
     bool dribble;
+
+    detect det;
 };
 
-
-struct kkk
-{
-    float d1, d2, d3;
-};
 
 
 struct data {
@@ -26,45 +28,17 @@ struct data {
 
 typedef struct data Struct;
 
-std::pair <float, float> line_and_AngleMaker(float x_active, float y_active, float x_target, float y_target){
+std::pair <float, float> line_and_AngleMaker(detect V){
 
 
-    float Distance = hypot((x_target - x_active), (y_target - y_active));
-    float Angle = acos((x_target - x_active)/Distance);
+    float Distance = hypot((V.ball.x() - V.player.x()), (V.ball.y() - V.player.y()));
+    float Angle = acos((V.ball.x() - V.player.x())/Distance);
 
-    if(y_target < y_active){
+    if(V.ball.y() < V.player.y()){
         Angle = 2*M_PI - Angle;
     }
 
     return std::make_pair (Distance, Angle);
-}
-
-
-kkk elect(kkk e){
-    using namespace std;
-    // Declaring vector of pairs
-        vector< pair <int,float> > vect;
-
-        // Initializing 1st and 2nd element of
-        // pairs with array values
-        int players[] = {0, 1, 2};
-        float distances[] = {e.d1, e.d2, e.d3};
-
-        // Entering values in vector of pairs
-        for (int i=0; i<3; i++)
-            vect.push_back( make_pair(distances[i], players[i]));
-
-
-        // Using simple sort() function to sort
-           sort(vect.begin(), vect.end());
-
-
-        kkk result;
-        result.d1 = vect[0].second;
-        result.d2 = vect[1].second;
-        result.d3 = vect[2].second;
-
-        return result;
 }
 
 
@@ -169,10 +143,10 @@ int main(int argc, char *argv[]) {
     bool inicio = true;
     //int armador, atacante, meia;
     float playerAngle, trave1, trave2, kickAngle;
-    Struct result; kkk distances; kkk players;
+    Struct result;
 
     jogador armador, meia, atacante;
-
+    detect x;
 
 
     while(true) {
@@ -185,17 +159,21 @@ int main(int argc, char *argv[]) {
         SSL_DetectionRobot player1 = vision->getLastRobotDetection(false, 1);
         SSL_DetectionRobot player2 = vision->getLastRobotDetection(false, 2);
 
-        distances.d1 = line_and_AngleMaker(player0.x(), player0.y(), ball.x(), ball.y()).first;
-        distances.d2 = line_and_AngleMaker(player1.x(), player1.y(), ball.x(), ball.y()).first;
-        distances.d3 = line_and_AngleMaker(player2.x(), player2.y(), ball.x(), ball.y()).first;
 
-        if(inicio && distances.d1 > 0 && distances.d2 > 0 && distances.d3 > 0){
-            players = elect(distances);
-            inicio = false;
-            std::cout << players.d1 << '\n';
-            std::cout << players.d2 << '\n';
-            std::cout << players.d3 << '\n';
-        }
+        armador.det.ball = ball;
+        armador.det.player = player0;
+
+//        distances.d1 = line_and_AngleMaker(x).first;
+//        distances.d2 = line_and_AngleMaker(x).first;
+//        distances.d3 = line_and_AngleMaker(x).first;
+
+//        if(inicio && distances.d1 > 0 && distances.d2 > 0 && distances.d3 > 0){
+//            players = elect(distances);
+//            inicio = false;
+//            std::cout << players.d1 << '\n';
+//            std::cout << players.d2 << '\n';
+//            std::cout << players.d3 << '\n';
+//        }
 
 
 
@@ -207,10 +185,12 @@ int main(int argc, char *argv[]) {
         if(playerAngle < 0){
             playerAngle = 2*M_PI + playerAngle;
         }
-        SSL_DetectionRobot active = player0;
+//        SSL_DetectionRobot active = player0;
 
 
-        std::pair<float, float> geometry = line_and_AngleMaker(active.x(), active.y(), ball.x(), ball.y());
+        std::pair<float, float> geometry = line_and_AngleMaker(armador.det);
+
+
 
         // geometry.first = distance, geometry.second = angle
         if(geometry.first > 300){
@@ -231,8 +211,7 @@ int main(int argc, char *argv[]) {
 //        }
 
 
-//        std::cout << passAngle*57.296 << '\n';
-//        std::cout << player.orientation()*57.296 << '\n';
+
 
 
 
@@ -318,4 +297,32 @@ int main(int argc, char *argv[]) {
 //kickAngle = (trave1 + trave2)/2;
 //if(kickAngle < 0){
 //    kickAngle = 2*M_PI + kickAngle;
+//}
+
+
+//kkk elect(kkk e){
+//    using namespace std;
+//    // Declaring vector of pairs
+//        vector< pair <int,float> > vect;
+
+//        // Initializing 1st and 2nd element of
+//        // pairs with array values
+//        int players[] = {0, 1, 2};
+//        float distances[] = {e.d1, e.d2, e.d3};
+
+//        // Entering values in vector of pairs
+//        for (int i=0; i<3; i++)
+//            vect.push_back( make_pair(distances[i], players[i]));
+
+
+//        // Using simple sort() function to sort
+//           sort(vect.begin(), vect.end());
+
+
+//        kkk result;
+//        result.d1 = vect[0].second;
+//        result.d2 = vect[1].second;
+//        result.d3 = vect[2].second;
+
+//        return result;
 //}
