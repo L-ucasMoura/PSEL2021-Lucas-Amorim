@@ -7,43 +7,100 @@
 
 struct detect{
     SSL_DetectionBall ball;
-    SSL_DetectionRobot player;
+    SSL_DetectionRobot activePlayer;
+    SSL_DetectionRobot targetPlayer;
+};
+
+struct measures{
+    float ballAngle, targetAngle, ballDistance, targetDistance, playerOrientation;
+
+};
+
+struct commands{
+    float vx, vw, kick;
+    bool dibble = false;
 };
 
 struct jogador
 {
     int robot;
-    float vx, vw, kick;
-    bool dribble;
+
+    commands com;
+
+    measures param;
 
     detect det;
 };
 
-
-
-struct data {
-    float vx, vy, vw, kick = 0;
-    bool dibble = false;
+struct task_Atribution{
+    float armador, meia, atacante;
 };
 
-typedef struct data Struct;
-
-std::pair <float, float> line_and_AngleMaker(detect V){
 
 
-    float Distance = hypot((V.ball.x() - V.player.x()), (V.ball.y() - V.player.y()));
-    float Angle = acos((V.ball.x() - V.player.x())/Distance);
 
-    if(V.ball.y() < V.player.y()){
-        Angle = 2*M_PI - Angle;
+measures line_and_AngleMaker(detect V){
+
+    measures m;
+
+    m.ballDistance = hypot((V.ball.x() - V.activePlayer.x()), (V.ball.y() - V.activePlayer.y()));
+    m.ballAngle = acos((V.ball.x() - V.activePlayer.x())/m.ballDistance);
+
+    if(V.ball.y() < V.activePlayer.y()){
+        m.ballAngle = 2*M_PI - m.ballAngle;
     }
 
-    return std::make_pair (Distance, Angle);
+    m.targetDistance = hypot((V.targetPlayer.x() - V.activePlayer.x()), (V.targetPlayer.y() - V.activePlayer.y()));
+    m.targetAngle = acos((V.targetPlayer.x() - V.activePlayer.x())/m.targetDistance);
+
+    if(V.targetPlayer.y() < V.activePlayer.y()){
+        m.targetAngle = 2*M_PI - m.targetAngle;
+    }
+
+    m.playerOrientation = V.activePlayer.orientation();
+    if(m.playerOrientation < 0){
+        m.playerOrientation = 2*M_PI + m.playerOrientation;
+    }
+
+
+    return m;
+}
+
+float velx(measures m){
+    float v (m.ballDistance);
+    return v;
+}
+
+task_Atribution elect(task_Atribution t){
+    using namespace std;
+    // Declaring vector of pairs
+    vector< pair <int,float> > vect;
+
+    // Initializing 1st and 2nd element of
+    // pairs with array values
+    int players[] = {0, 1, 2};
+    float distances[] = {t.armador, t.meia, t.atacante};
+
+    // Entering values in vector of pairs
+    for (int i=0; i<3; i++)
+        vect.push_back( make_pair(distances[i], players[i]));
+
+
+    // Using simple sort() function to sort
+       sort(vect.begin(), vect.end());
+
+
+    task_Atribution r;
+    r.armador = vect[0].second;
+    r.meia = vect[1].second;
+    r.atacante = vect[2].second;
+
+    return r;
 }
 
 
-Struct passar(float activeAngle, float passiveAngle, float yactive, float ypassive, float playersDistance){
-   Struct p;
+commands passar(float activeAngle, float passiveAngle, float yactive, float ypassive, float playersDistance){
+   commands p;
    float vel = 3;
    p.vx = 0.5;
 
@@ -66,13 +123,15 @@ Struct passar(float activeAngle, float passiveAngle, float yactive, float ypassi
 }
 
 
-Struct dominio(float playerAngle, float ballAngle){
-    Struct d;
+commands dominio(float playerAngle, float ballAngle){
+    commands d;
     d.dibble = true;
     float vel = 3;
 
     if(fabs(ballAngle - playerAngle) > 0.2){
+
         d.vx = 0;
+
         if(ballAngle > playerAngle){
             if(fabs(ballAngle - playerAngle) > M_PI){
                 d.vw = -vel;
@@ -98,37 +157,94 @@ Struct dominio(float playerAngle, float ballAngle){
 }
 
 
-Struct direct_to_target(float target, float playerAngle)
+float align(float target, float playerAngle)
 {
-    Struct a;
+    float vw;
     float vel = 4;
 
 
     if(fabs(target - playerAngle) > 0.2){
         if(target > playerAngle){
             if(fabs(target - playerAngle) > M_PI){
-                a.vw = -vel;
+                vw = -vel;
             }
             else{
-                a.vw = vel;
+                vw = vel;
             }
         }
         else{
             if(fabs(playerAngle - target) > M_PI){
-                a.vw = vel;
+                vw = vel;
             }
             else{
-                a.vw = -vel;
+                vw = -vel;
             }
         }
     }
     else{
-        a.vw = 0;
+        vw = 0;
     }
-        return a;
+
+    return vw;
 }
 
 
+commands go_to_target(measures m){
+    commands go;
+    float functionVel = (m.ballDistance/1000);
+    // Buscar a bola
+    if(m.ballDistance > 300){
+        go.dibble = false;
+        go.vx = functionVel;
+        go.vw = align(m.ballAngle, m.playerOrientation);
+    }
+    else{
+    // Dominar a bola
+        go.dibble = true;
+        if(fabs(m.ballAngle - m.playerOrientation) > 0.2){
+            go.vx = 0;
+            go.vw = align(m.ballAngle, m.playerOrientation);
+        }
+        else{
+            go.vx = 2;
+            go.vw = 0;
+        }
+    }
+
+     return go;
+}
+
+
+commands catcher(jogador armador){
+
+
+//    float playerAngle = armador.det.activePlayer.orientation();
+//    if(playerAngle < 0){
+//        playerAngle = 2*M_PI + playerAngle;
+//    }
+
+    armador.param.ballAngle = line_and_AngleMaker(armador.det).ballAngle;
+    armador.param.ballDistance = line_and_AngleMaker(armador.det).ballDistance;
+    armador.param.targetAngle = line_and_AngleMaker(armador.det).targetAngle;
+    armador.param.targetDistance = line_and_AngleMaker(armador.det).targetDistance;
+    armador.param.playerOrientation = line_and_AngleMaker(armador.det).playerOrientation;
+
+    std::cout << armador.param.targetAngle * 57.296 << '\n';
+    std::cout << armador.param.ballAngle * 57.296 << '\n';
+    std::cout << armador.param.playerOrientation * 57.296 << '\n';
+
+    return armador.com;
+
+}
+
+
+void mid_field(){
+
+}
+
+void attacker(){
+
+}
 
 int main(int argc, char *argv[]) {
     QCoreApplication a(argc, argv);
@@ -139,14 +255,7 @@ int main(int argc, char *argv[]) {
     // Desired frequency
     int desiredFrequency = 60;
 
-
-    bool inicio = true;
-    //int armador, atacante, meia;
-    float playerAngle, trave1, trave2, kickAngle;
-    Struct result;
-
     jogador armador, meia, atacante;
-    detect x;
 
 
     while(true) {
@@ -154,26 +263,20 @@ int main(int argc, char *argv[]) {
 
         // TimePoint
         std::chrono::high_resolution_clock::time_point beforeProcess = std::chrono::high_resolution_clock::now();
+
         SSL_DetectionBall ball = vision->getLastBallDetection();
-        SSL_DetectionRobot player0 = vision->getLastRobotDetection(false, 0);
-        SSL_DetectionRobot player1 = vision->getLastRobotDetection(false, 1);
-        SSL_DetectionRobot player2 = vision->getLastRobotDetection(false, 2);
+        SSL_DetectionRobot player_a = vision->getLastRobotDetection(false, 0);
+        SSL_DetectionRobot player_b = vision->getLastRobotDetection(false, 1);
+        SSL_DetectionRobot player_c = vision->getLastRobotDetection(false, 2);
 
+        armador.det.activePlayer = player_a; armador.det.targetPlayer = player_b;
 
-        armador.det.ball = ball;
-        armador.det.player = player0;
+        meia.det.activePlayer = player_b; meia.det.targetPlayer = player_c;
 
-//        distances.d1 = line_and_AngleMaker(x).first;
-//        distances.d2 = line_and_AngleMaker(x).first;
-//        distances.d3 = line_and_AngleMaker(x).first;
+        atacante.det.activePlayer = player_c;
 
-//        if(inicio && distances.d1 > 0 && distances.d2 > 0 && distances.d3 > 0){
-//            players = elect(distances);
-//            inicio = false;
-//            std::cout << players.d1 << '\n';
-//            std::cout << players.d2 << '\n';
-//            std::cout << players.d3 << '\n';
-//        }
+        armador.det.ball = meia.det.ball = atacante.det.ball = ball;
+
 
 
 
@@ -181,25 +284,19 @@ int main(int argc, char *argv[]) {
         vision->processNetworkDatagrams();
 
 
-        playerAngle = player0.orientation();
-        if(playerAngle < 0){
-            playerAngle = 2*M_PI + playerAngle;
-        }
-//        SSL_DetectionRobot active = player0;
 
 
-        std::pair<float, float> geometry = line_and_AngleMaker(armador.det);
+//        std::pair<float, float> geometry = line_and_AngleMaker(armador.det);
 
 
-
-        // geometry.first = distance, geometry.second = angle
-        if(geometry.first > 300){
-            result = direct_to_target(geometry.second, playerAngle);
-            result.vx = 1 + 0.5*(geometry.first/1000);
-        }
-        else{
-            result = dominio(playerAngle, geometry.second);
-            }
+//        // geometry.first = distance, geometry.second = angle
+//        if(geometry.first > 300){
+//            result = direct_to_target(geometry.second, playerAngle);
+//            result.vx = 1 + 0.5*(geometry.first/1000);
+//        }
+//        else{
+//            result = dominio(playerAngle, geometry.second);
+//            }
 
 //        else{
 //            if(geometry.first < 150 && fabs(geometry.second - playerAngle) < 0.4){
@@ -213,10 +310,10 @@ int main(int argc, char *argv[]) {
 
 
 
+        armador.com = catcher(armador);
 
 
-
-        actuator->sendCommand(false, 0, result.vx, result.vy, result.vw, result.dibble, result.kick);
+        //actuator->sendCommand(false, 0, armador.com.vx, 0, armador.com.vw, 0, 0);
 
 
 
@@ -266,11 +363,7 @@ int main(int argc, char *argv[]) {
 //float passAngle = acos(p_x/playerDistance);
 
 
-// // player/ball measures
-//float desl_y = (ball.y() - player0.y());             //resultado em pixel
-//float desl_x = (ball.x() - player0.x());             //resultado em pixel
-//float ballDistance = hypot(desl_x, desl_y);         //resultado em pixels
-//float BallAngle = acos(desl_x/ballDistance);        //resultado em rad
+
 //trave1 = acos((4502 - player0.x()) / hypot((4502 - player0.x()),(494 - player0.y())));     //resultado em rad
 //trave2 = acos((4502 - player0.x()) / hypot((4502 - player0.x()),(-494 - player0.y())));    //resultado em rad
 
@@ -300,29 +393,34 @@ int main(int argc, char *argv[]) {
 //}
 
 
-//kkk elect(kkk e){
-//    using namespace std;
-//    // Declaring vector of pairs
-//        vector< pair <int,float> > vect;
-
-//        // Initializing 1st and 2nd element of
-//        // pairs with array values
-//        int players[] = {0, 1, 2};
-//        float distances[] = {e.d1, e.d2, e.d3};
-
-//        // Entering values in vector of pairs
-//        for (int i=0; i<3; i++)
-//            vect.push_back( make_pair(distances[i], players[i]));
 
 
-//        // Using simple sort() function to sort
-//           sort(vect.begin(), vect.end());
+//float direct_to_target(measure m, float target, float playerAngle)
+//{
+//    float vw;
+//    float vel = 4;
 
 
-//        kkk result;
-//        result.d1 = vect[0].second;
-//        result.d2 = vect[1].second;
-//        result.d3 = vect[2].second;
-
-//        return result;
+//    if(fabs(target - playerAngle) > 0.2){
+//        if(target > playerAngle){
+//            if(fabs(target - playerAngle) > M_PI){
+//                vw = -vel;
+//            }
+//            else{
+//                vw = vel;
+//            }
+//        }
+//        else{
+//            if(fabs(playerAngle - target) > M_PI){
+//                vw = vel;
+//            }
+//            else{
+//                vw = -vel;
+//            }
+//        }
+//    }
+//    else{
+//        vw = 0;
+//    }
+//        return vw;
 //}
