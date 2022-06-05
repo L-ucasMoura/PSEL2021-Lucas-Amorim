@@ -47,29 +47,27 @@ measures line_and_AngleMaker(detect V){
     m.ballAngle = acos((V.ball.x() - V.activePlayer.x())/m.ballDistance);
 
     if(V.ball.y() < V.activePlayer.y()){
-        m.ballAngle = 2*M_PI - m.ballAngle;
+//        m.ballAngle = 2*M_PI - m.ballAngle;
+        m.ballAngle = -m.ballAngle;
     }
 
     m.targetDistance = hypot((V.targetPlayer.x() - V.activePlayer.x()), (V.targetPlayer.y() - V.activePlayer.y()));
     m.targetAngle = acos((V.targetPlayer.x() - V.activePlayer.x())/m.targetDistance);
 
-    if(V.targetPlayer.y() < V.activePlayer.y()){
-        m.targetAngle = 2*M_PI - m.targetAngle;
-    }
+//    if(V.targetPlayer.y() < V.activePlayer.y()){
+//        m.targetAngle = 2*M_PI - m.targetAngle;
+//    }
 
     m.playerOrientation = V.activePlayer.orientation();
-    if(m.playerOrientation < 0){
-        m.playerOrientation = 2*M_PI + m.playerOrientation;
-    }
+//    if(m.playerOrientation < 0){
+//        m.playerOrientation = 2*M_PI + m.playerOrientation;
+//    }
 
 
     return m;
 }
 
-float velx(measures m){
-    float v (m.ballDistance);
-    return v;
-}
+
 
 task_Atribution elect(task_Atribution t){
     using namespace std;
@@ -157,27 +155,26 @@ commands dominio(float playerAngle, float ballAngle){
 }
 
 
-float align(float target, float playerAngle)
-{
-    float vw;
+
+float align(float target, float playerAngle){
     float vel = 4;
+    float vw;
 
-
-    if(fabs(target - playerAngle) > 0.2){
-        if(target > playerAngle){
-            if(fabs(target - playerAngle) > M_PI){
-                vw = -vel;
+    if(fabs(playerAngle - target) > 0.2){
+        if(playerAngle > target){
+            if(fabs(playerAngle - target) >= M_PI){
+                vw = vel;
             }
             else{
-                vw = vel;
+                vw = -vel;
             }
         }
         else{
             if(fabs(playerAngle - target) > M_PI){
-                vw = vel;
+                vw = -vel;
             }
             else{
-                vw = -vel;
+                vw = vel;
             }
         }
     }
@@ -185,13 +182,14 @@ float align(float target, float playerAngle)
         vw = 0;
     }
 
+
     return vw;
 }
 
 
 commands go_to_target(measures m){
     commands go;
-    float functionVel = (m.ballDistance/1000);
+    float functionVel = 1 + 0.5*(m.ballDistance/1000);
     // Buscar a bola
     if(m.ballDistance > 300){
         go.dibble = false;
@@ -218,20 +216,15 @@ commands go_to_target(measures m){
 commands catcher(jogador armador){
 
 
-//    float playerAngle = armador.det.activePlayer.orientation();
-//    if(playerAngle < 0){
-//        playerAngle = 2*M_PI + playerAngle;
-//    }
-
     armador.param.ballAngle = line_and_AngleMaker(armador.det).ballAngle;
     armador.param.ballDistance = line_and_AngleMaker(armador.det).ballDistance;
     armador.param.targetAngle = line_and_AngleMaker(armador.det).targetAngle;
     armador.param.targetDistance = line_and_AngleMaker(armador.det).targetDistance;
     armador.param.playerOrientation = line_and_AngleMaker(armador.det).playerOrientation;
 
-    std::cout << armador.param.targetAngle * 57.296 << '\n';
-    std::cout << armador.param.ballAngle * 57.296 << '\n';
-    std::cout << armador.param.playerOrientation * 57.296 << '\n';
+
+    //armador.com.vw = align(armador.param.ballAngle, armador.det.activePlayer.orientation());
+    armador.com = go_to_target(armador.param);
 
     return armador.com;
 
@@ -308,12 +301,11 @@ int main(int argc, char *argv[]) {
 //        }
 
 
-
-
         armador.com = catcher(armador);
+        //std::cout << player_a.orientation() * 57.296 << '\n';
 
 
-        //actuator->sendCommand(false, 0, armador.com.vx, 0, armador.com.vw, 0, 0);
+        actuator->sendCommand(false, 0, armador.com.vx, 0, armador.com.vw, armador.com.dibble, 0);
 
 
 
@@ -423,4 +415,30 @@ int main(int argc, char *argv[]) {
 //        vw = 0;
 //    }
 //        return vw;
+//}
+
+
+//if(fabs(target - playerAngle) > 0.2){
+//    if(target > playerAngle){
+//        if(fabs(target - playerAngle) > M_PI){
+//            vw = -vel;
+//        }
+//        else{
+//            vw = vel;
+//        }
+//    }
+//    else{
+//        if(fabs(playerAngle - target) > M_PI){
+//            vw = vel;
+//        }
+//        else{
+//            vw = -vel;
+//        }
+//    }
+//}
+//else{
+//    vw = 0;
+//}
+
+//return vw;
 //}
