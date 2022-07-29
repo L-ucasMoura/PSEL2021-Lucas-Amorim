@@ -5,7 +5,7 @@
 #include <modules/vision/vision.h>
 #include <cmath>
 
-QVector<bool> dominio = {true, false, false};
+QVector<bool> dominio = {false, false, false};
 
 
 struct detect{
@@ -127,23 +127,6 @@ float align(float target, float playerAngle){
 }
 
 
-commands passar(jogador j){
-   commands p;
-   p.vx = 0;
-
-   if(fabs(j.param.targetAngle - j.det.activePlayer.orientation()) < 0.2){
-       p.vw = align(j.param.targetAngle, j.det.activePlayer.orientation());
-       }
-   std::cout << j.param.targetAngle*57.296 << '\n';
-
-//   else{
-//       p.kick = 1 + 0.8*j.param.targetDistance/1000;
-//   }
-
-    return p;
-}
-
-
 commands go_to_ball(measures m){
     commands go;
     float functionVel = 1 + 0.5*(m.ballDistance/1000);
@@ -213,38 +196,51 @@ commands catcher(jogador armador){
     armador.param.targetDistance = line_and_AngleMaker(armador.det).targetDistance;
     armador.param.playerOrientation = line_and_AngleMaker(armador.det).playerOrientation;
 
-    std::cout << armador.param.targetAngle*57.296 << '\n';
-    std::cout << armador.param.targetDistance <<'\n';
-    //bola não dominada
-    if(armador.param.ballDistance > 150){
-        armador.com = go_to_ball(armador.param);
-    }
-    //bola dominada
-    else{
-    //correr na direção do gol
-        if(fabs(armador.det.activePlayer.x() - armador.det.firstOption.x()) < 1900 || armador.param.targetDistance < 1500){
-            armador.com.vw = align(armador.param.targetAngle, armador.det.activePlayer.orientation());
-            armador.com.vx = 0;
-
-            if(fabs(armador.param.playerOrientation - armador.param.targetAngle) < 0.4){
-                //armador.com.kick = 3;
-                armador.com.kick = 2 + 0.5*(armador.param.targetDistance/1000);
-            }
+    //nenhum dos jogadores tem domínio da bola, então cabe ao armador ir buscá-la p/ iniciar a jogada
+    if(dominio[1] == false && dominio[2] == false){
+        //bola não dominada
+        if(armador.param.ballDistance > 150){
+            armador.com = go_to_ball(armador.param);
+            dominio[0]= false;
         }
+
+        //bola dominada
         else{
             dominio[0] = true;
-            armador.com.vw = align(0, armador.param.playerOrientation);
-            armador.com.vx = 0;
 
-            if(fabs(armador.param.playerOrientation) < 0.2){
-                armador.com.vx = 1.5;
+            //rotina de passe
+            if(fabs(armador.det.activePlayer.x() - armador.det.firstOption.x()) < 1900 || armador.param.targetDistance < 1500){
+
+                //alinhar passe
+                armador.com.vw = align(armador.param.targetAngle, armador.det.activePlayer.orientation());
+                armador.com.vx = 0;
+
+                //efetuar passe à frente do alvo
+                if(fabs(armador.param.playerOrientation - armador.param.targetAngle) < 0.4){
+                    armador.com.kick = 2 + 0.5*(armador.param.targetDistance/1000);
+                    dominio[1] = true;
+                    dominio[0] = false;
+                }
+            }
+
+            //correr na direção do gol
+            else{
+
+                //alinhar com área adversária
+                armador.com.vw = align(0, armador.param.playerOrientation);
+                armador.com.vx = 0;
+
+                // correr em frente
+                if(fabs(armador.param.playerOrientation) < 0.2){
+                    armador.com.vx = 0.5;
+                }
             }
         }
-
-
     }
-        //Efetuar passe
-
+    //comportamento após efetuar o passe
+    else{
+        armador.com.vw = 0; armador.com.vx = 0; armador.com.kick = 0;
+    }
 
     return armador.com;
 
@@ -260,24 +256,34 @@ commands mid_field(jogador meia){
     meia.param.playerOrientation = line_and_AngleMaker(meia.det).playerOrientation;
 
     float distance;
-    float k = -1700;
+    float y = -1500;
 
-    if(meia.det.ball.y() != 0){k= meia.det.ball.y()/fabs(meia.det.ball.y()) *-1700;}
+    if(meia.det.ball.y() != 0){y= meia.det.ball.y()/fabs(meia.det.ball.y()) *-1500;}
 
-    meia.param.initialAngle = get_position(meia.det, 1, k).first;
-    distance = get_position(meia.det, 1, k).second;
+    // def posição inicial
+    meia.param.initialAngle = get_position(meia.det, 1, y).first;
+    distance = get_position(meia.det, 1, y).second;
 
+    //Qnd estiver sem a posse da bola, o meia vai se posicionar em uma das laterais pra receber o passe
+    if(dominio[0] == false && dominio[1] == false){
 
-
-    if(distance > 300){
-        meia.com.vw = align(meia.param.initialAngle, meia.param.playerOrientation);
-        meia.com.vx = 1.5;
+        // ir para posição inicial
+        if(distance > 300){
+            meia.com.vw = align(meia.param.initialAngle, meia.param.playerOrientation);
+            meia.com.vx = 1.5;
+        }
+        else{
+            meia.com.vw = align(meia.param.ballAngle, meia.param.playerOrientation);
+            meia.com.vx = 0;
+         }
     }
-    else{
-        meia.com.vw = align(meia.param.ballAngle, meia.param.playerOrientation);
-        meia.com.vx = 0;
-     }
 
+    else{
+        //Qnd o domínio for atribuido ao meia
+        if(dominio[1] == true && meia.det.activePlayer.x() < meia.det.ball.x() && meia.param.ballDistance < 1500){
+            meia.com = go_to_ball(meia.param);
+        }
+    }
 
     //meia.com = go_to_ball(meia.param);
     
@@ -295,8 +301,8 @@ commands attacker(jogador atacante){
     atacante.param.targetDistance = line_and_AngleMaker(atacante.det).targetDistance;
     atacante.param.playerOrientation = line_and_AngleMaker(atacante.det).playerOrientation;
 
-    float k = 1700;
-    if(atacante.det.ball.y() != 0){k= atacante.det.ball.y()/fabs(atacante.det.ball.y()) *1700;}
+    float k = 1500;
+    if(atacante.det.ball.y() != 0){k= atacante.det.ball.y()/fabs(atacante.det.ball.y()) *1500;}
 
     atacante.param.initialAngle = get_position(atacante.det, 2, k).first;
     float distance = get_position(atacante.det, 2, k).second;
@@ -337,7 +343,9 @@ int main(int argc, char *argv[]) {
         armador.det.ball = meia.det.ball = atacante.det.ball = ball;
 
 
-
+        if(fabs(ball.x()) > 5000 || fabs(ball.y()) > 3250){
+            dominio = {false, false, false};
+        }
 
         // Process vision and actuator commands
         vision->processNetworkDatagrams();
@@ -353,14 +361,16 @@ int main(int argc, char *argv[]) {
 //        }
 
 
+        std::cout << dominio[0]<< dominio[1] << dominio[2] << '\n';
+
         armador.com = catcher(armador);
         meia.com = mid_field(meia);
         atacante.com = attacker(atacante);
 
 
         actuator->sendCommand(false, 0, armador.com.vx, 0, armador.com.vw, armador.com.dibble, armador.com.kick);
-//        actuator->sendCommand(false, 1, meia.com.vx, 0, meia.com.vw);
-//        actuator->sendCommand(false, 2, atacante.com.vx, 0, atacante.com.vw);
+        actuator->sendCommand(false, 1, meia.com.vx, 0, meia.com.vw, meia.com.dibble);
+        actuator->sendCommand(false, 2, atacante.com.vx, 0, atacante.com.vw);
 
 
 
